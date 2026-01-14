@@ -1,5 +1,5 @@
 {
-  "name": "PyForge AI - Advanced Python IDE",
-  "description": "A high-performance Python execution environment powered by Pyodide with integrated Gemini AI for code generation, debugging, and optimization.",
+  "name": "ParadoV2 ArcticX IDE",
+  "description": "Advanced Python IDE powered by the ArcticX AI assistant, developed by Shashwat Ranjan Jha.",
   "requestFramePermissions": []
 }
