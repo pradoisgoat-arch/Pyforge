@@ -25,8 +25,6 @@ import {
 import { FileNode, ConsoleMessage } from './types';
 import { getAIAssistance } from './services/gemini';
 
-console.log("ParadoV2: App.tsx module loaded.");
-
 const App: React.FC = () => {
   const [pyodide, setPyodide] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -36,7 +34,7 @@ const App: React.FC = () => {
   ]);
   const [activeFileId, setActiveFileId] = useState('1');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isConsoleExpanded, setIsConsoleExpanded] = useState(true);
@@ -57,39 +55,36 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
-    console.log("ParadoV2: App component mounted.");
     let mounted = true;
     
     const init = async () => {
       try {
-        console.log("ParadoV2: Starting Pyodide initialization...");
+        console.log("App: Initializing Pyodide runtime...");
         let checkCount = 0;
-        while (typeof (window as any).loadPyodide === 'undefined' && checkCount < 100) {
+        while (typeof (window as any).loadPyodide === 'undefined' && checkCount < 150) {
           await new Promise(r => setTimeout(r, 100));
           checkCount++;
         }
 
         if (typeof (window as any).loadPyodide === 'undefined') {
-          throw new Error("Pyodide script failed to load from CDN. Check your internet connection or firewall.");
+          throw new Error("CDN script for Pyodide failed to load. Please check your network or refresh the page.");
         }
 
         const py = await (window as any).loadPyodide({
           indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
         });
         
-        console.log("ParadoV2: Pyodide binary loaded. Loading micropip...");
         await py.loadPackage(["micropip"]);
         
         if (mounted) {
           setPyodide(py);
           setIsLoading(false);
-          console.log("ParadoV2: Initialization complete.");
           addConsoleMessage('system', 'ParadoV2 Core successfully initialized. Python 3.12 (WASM) is live.');
         }
       } catch (err: any) {
-        console.error("ParadoV2 Init Error:", err);
+        console.error("App: Init Error", err);
         if (mounted) {
-          setLoadError(err.message || "Unknown error during initialization.");
+          setLoadError(err.message || "Failed to initialize the Python engine.");
           setIsLoading(false);
         }
       }
@@ -101,9 +96,7 @@ const App: React.FC = () => {
       if (window.innerWidth < 1024) setIsSidebarOpen(false);
       else setIsSidebarOpen(true);
     };
-    handleResize();
     window.addEventListener('resize', handleResize);
-    
     return () => { 
       mounted = false; 
       window.removeEventListener('resize', handleResize);

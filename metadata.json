@@ -1,5 +1,8 @@
 {
   "name": "ParadoV2 ArcticX IDE",
   "description": "Advanced Python IDE powered by the ArcticX AI assistant, developed by Shashwat Ranjan Jha.",
-  "requestFramePermissions": []
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
 }

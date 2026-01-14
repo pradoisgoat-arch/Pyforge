@@ -1,24 +1,19 @@
 
 import React from 'react';
-import ReactDOM from 'react-dom/client';
+import { createRoot } from 'react-dom/client';
 import App from './App';
 
-console.log("ParadoV2: index.tsx loaded. Attempting to mount React root...");
+console.log("ParadoV2: Initializing React 19 Root...");
 
-const rootElement = document.getElementById('root');
-if (!rootElement) {
-  console.error("ParadoV2: Could not find root element to mount to");
-  throw new Error("Could not find root element to mount to");
-}
-
-try {
-  const root = ReactDOM.createRoot(rootElement);
+const container = document.getElementById('root');
+if (container) {
+  const root = createRoot(container);
   root.render(
     <React.StrictMode>
       <App />
     </React.StrictMode>
   );
-  console.log("ParadoV2: React.render called.");
-} catch (e) {
-  console.error("ParadoV2: Mounting failed!", e);
+  console.log("ParadoV2: Render sequence initiated.");
+} else {
+  console.error("ParadoV2: Root container not found!");
 }

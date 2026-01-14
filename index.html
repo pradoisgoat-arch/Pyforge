@@ -7,71 +7,55 @@
     <title>ParadoV2 | ArcticX IDE</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%233b82f6'/%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8'/%3E%3C/linearGradient%3E%3Cpath d='M50 5 L90 25 L90 75 L50 95 L10 75 L10 25 Z' fill='url(%23g)'/%3E%3Cpath d='M30 40 L50 30 L70 40 L70 60 L50 70 L30 60 Z' fill='white' opacity='0.8'/%3E%3C/svg%3E" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Preload Pyodide -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
-      // Ultimate Failsafe for environment variables
-      (function() {
-        if (typeof window.process === 'undefined') {
-          window.process = { env: {} };
-        } else if (typeof window.process.env === 'undefined') {
-          window.process.env = {};
+      // Global failsafe for process object used by some libraries
+      window.process = { env: { API_KEY: "" } };
+      
+      window.onerror = function(msg, url, line, col, error) {
+        console.error("PARADO_BOOT_ERR:", msg);
+        const root = document.getElementById('root');
+        if (root && (root.innerHTML.includes('loading-spinner') || root.innerHTML === '')) {
+          root.innerHTML = `
+            <div style="height: 100vh; background: #020617; color: #ef4444; display: flex; align-items: center; justify-content: center; font-family: sans-serif; padding: 20px; text-align: center;">
+              <div>
+                <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 10px;">BOOT ENGINE CRASHED</h1>
+                <p style="color: #94a3b8; font-size: 14px; max-width: 400px;">${msg}</p>
+                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer;">RESTART ENGINE</button>
+              </div>
+            </div>`;
         }
-        console.log("ParadoV2: Process polyfill applied.");
-      })();
-
-      // Global error listener for debugging deployment
-      window.onerror = function(message, source, lineno, colno, error) {
-        console.error("ParadoV2 Global Error:", message, "at", source, lineno, colno);
       };
     </script>
     <style>
-      body {
-        font-family: 'Inter', sans-serif;
-        background-color: #020617;
-        color: #f8fafc;
-        margin: 0;
-        overflow: hidden;
-      }
-      .code-font {
-        font-family: 'Fira Code', monospace;
-      }
-      ::-webkit-scrollbar {
-        width: 6px;
-        height: 6px;
-      }
-      ::-webkit-scrollbar-track {
-        background: transparent;
-      }
-      ::-webkit-scrollbar-thumb {
-        background: #334155;
-        border-radius: 10px;
-      }
-      ::-webkit-scrollbar-thumb:hover {
-        background: #475569;
-      }
-      .glass-card {
-        background: rgba(15, 23, 42, 0.7);
-        backdrop-filter: blur(12px);
-        border: 1px solid rgba(255, 255, 255, 0.05);
-      }
+      body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; margin: 0; overflow: hidden; }
+      .code-font { font-family: 'Fira Code', monospace; }
+      .glass-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
+      @keyframes spin { to { transform: rotate(360deg); } }
+      .loading-spinner { width: 50px; height: 50px; border: 4px solid rgba(59, 130, 246, 0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
     </style>
-  <script type="importmap">
+    <script type="importmap">
 {
   "imports": {
     "react": "https://esm.sh/react@19.0.0",
     "react-dom": "https://esm.sh/react-dom@19.0.0",
     "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react,react-dom",
     "@google/genai": "https://esm.sh/@google/genai@1.35.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
     "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
-</head>
+  </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617;">
+        <div class="loading-spinner"></div>
+        <p style="margin-top: 20px; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 900; color: #3b82f6; letter-spacing: 0.5em; text-transform: uppercase;">Booting Parado Engine</p>
+      </div>
+    </div>
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>

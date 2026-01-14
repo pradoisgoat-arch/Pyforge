@@ -8,13 +8,29 @@ const cleanOutput = (text: string | undefined): string => {
   return text.replace(/\*/g, '');
 };
 
+const getApiKey = (): string => {
+  try {
+    // Check various common places for the key
+    return (window as any).process?.env?.API_KEY || 
+           (typeof process !== 'undefined' ? process.env.API_KEY : '') || 
+           '';
+  } catch (e) {
+    return '';
+  }
+};
+
 export const getAIAssistance = async (
   prompt: string,
   code: string,
   mode: 'debug' | 'optimize' | 'explain' | 'generate'
 ) => {
-  // Initialize lazily to prevent crashing if process.env is accessed too early
-  const apiKey = (window as any).process?.env?.API_KEY || (process as any)?.env?.API_KEY || '';
+  const apiKey = getApiKey();
+  
+  // If API_KEY is missing, we fail gracefully with a descriptive error
+  if (!apiKey) {
+    return "ArcticX Error: API_KEY is missing in environment. AI features are disabled.";
+  }
+
   const ai = new GoogleGenAI({ apiKey });
 
   const systemInstructions = {
@@ -35,8 +51,8 @@ export const getAIAssistance = async (
     });
 
     return cleanOutput(response.text);
-  } catch (error) {
+  } catch (error: any) {
     console.error("ArcticX AI Error:", error);
-    throw error;
+    return `ArcticX AI Error: ${error?.message || "Communication failure"}`;
   }
 };
