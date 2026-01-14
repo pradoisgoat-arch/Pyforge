@@ -11,9 +11,3 @@ export interface ConsoleMessage {
   content: string;
   timestamp: Date;
 }
-
-export interface ChatMessage {
-  role: 'user' | 'model';
-  parts: { text: string }[];
-  toolCalls?: any[];
-}
