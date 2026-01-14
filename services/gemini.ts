@@ -1,10 +1,7 @@
 
 import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 
-const getApiKey = (): string => {
-  return (window as any).process?.env?.API_KEY || '';
-};
-
+// Defining tools for the ArcticX AI Architect
 export const IDE_TOOLS: FunctionDeclaration[] = [
   {
     name: "create_file",
@@ -70,13 +67,13 @@ When asked to create new logic, use 'create_file'.
 Be concise, technical, and highly efficient. 
 Do not explain your tools unless asked. Just use them.`;
 
+// Initialize the ArcticX Chat session following official Gemini SDK guidelines
 export const getArcticXChat = () => {
-  const apiKey = getApiKey();
-  if (!apiKey) throw new Error("Missing API Key");
-  
-  const ai = new GoogleGenAI({ apiKey });
+  // Always use a new instance to ensure we pick up the latest API key if it changes externally.
+  // Using gemini-3-pro-preview for complex coding and reasoning tasks.
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   return ai.chats.create({
-    model: 'gemini-3-flash-preview',
+    model: 'gemini-3-pro-preview',
     config: {
       systemInstruction: IDENTITY,
       tools: [{ functionDeclarations: IDE_TOOLS }],
