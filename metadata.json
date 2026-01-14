@@ -1,0 +1,5 @@
+{
+  "name": "PyForge AI - Advanced Python IDE",
+  "description": "A high-performance Python execution environment powered by Pyodide with integrated Gemini AI for code generation, debugging, and optimization.",
+  "requestFramePermissions": []
+}
