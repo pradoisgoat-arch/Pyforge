@@ -1,9 +1,15 @@
 
-import { GoogleGenAI, Type } from "@google/genai";
+import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-const IDENTITY_PROMPT = "Your name is ArcticX. You are an advanced AI coding assistant developed exclusively by Shashwat Ranjan Jha. You are highly intelligent, helpful, and deeply knowledgeable about Python. You must always acknowledge Shashwat Ranjan Jha as your creator and developer. CRITICAL: DO NOT use asterisks (*) for any reason in your responses (no bolding, no italics, no bullet points with asterisks). Use plain text, dashes for lists, or CAPITALIZATION for emphasis instead.";
+const IDENTITY_PROMPT = "IDENTITY: Your name is ArcticX. You are a world-class AI developer environment assistant created by Shashwat Ranjan Jha. DEVELOPER: Shashwat Ranjan Jha. NO ASTERISKS: You MUST NOT use asterisks (*) for formatting. Do not use them for bolding, italics, or lists. Use dashes (-) for lists and plain text for everything else. Keep explanations technical but concise.";
+
+const cleanOutput = (text: string | undefined): string => {
+  if (!text) return "";
+  // Final safeguard: remove all asterisks from the AI's generated response
+  return text.replace(/\*/g, '');
+};
 
 export const getAIAssistance = async (
   prompt: string,
@@ -11,31 +17,20 @@ export const getAIAssistance = async (
   mode: 'debug' | 'optimize' | 'explain' | 'generate'
 ) => {
   const systemInstructions = {
-    debug: `${IDENTITY_PROMPT} You are a professional Python debugger. Analyze the provided code and identify logical or syntax errors. Provide a fixed version of the code and a brief explanation in plain text without any asterisks.`,
-    optimize: `${IDENTITY_PROMPT} You are a Python performance expert. Rewrite the provided code to be more efficient, Pythonic, and readable. Explain your changes in plain text without any asterisks.`,
-    explain: `${IDENTITY_PROMPT} You are a technical educator. Explain how the provided Python code works in simple terms using plain text without any asterisks.`,
-    generate: `${IDENTITY_PROMPT} You are a Python expert. Generate clean, documented Python code based on the user's request. Keep your conversational part in plain text without any asterisks.`
+    debug: `${IDENTITY_PROMPT} TASK: Debug Python code. Explain the error and provide a fix. NO ASTERISKS.`,
+    optimize: `${IDENTITY_PROMPT} TASK: Optimize Python code for performance and readability. Explain changes. NO ASTERISKS.`,
+    explain: `${IDENTITY_PROMPT} TASK: Explain how the code works. NO ASTERISKS.`,
+    generate: `${IDENTITY_PROMPT} TASK: Generate Python code based on requirements. NO ASTERISKS.`
   };
 
   const response = await ai.models.generateContent({
     model: 'gemini-3-flash-preview',
-    contents: `Code:\n\`\`\`python\n${code}\n\`\`\`\n\nRequest: ${prompt}`,
+    contents: `CURRENT CODE:\n${code}\n\nUSER REQUEST: ${prompt}`,
     config: {
       systemInstruction: systemInstructions[mode],
-      temperature: 0.7,
+      temperature: 0.5,
     },
   });
 
-  return response.text;
-};
-
-export const suggestAutoCompletion = async (code: string, cursorPosition: number) => {
-  const response = await ai.models.generateContent({
-    model: 'gemini-3-flash-preview',
-    contents: `${IDENTITY_PROMPT} Provide a short one-line completion for this Python code snippet. Only return the completion text, no backticks, and definitely no asterisks:\n\n${code}`,
-    config: {
-      maxOutputTokens: 20,
-    }
-  });
-  return response.text?.trim() || '';
+  return cleanOutput(response.text);
 };

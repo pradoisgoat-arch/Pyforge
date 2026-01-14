@@ -17,7 +17,9 @@ import {
   Check,
   AlertCircle,
   Menu,
-  ChevronDown
+  MoreVertical,
+  Layers,
+  Code
 } from 'lucide-react';
 import { FileNode, ConsoleMessage } from './types';
 import { getAIAssistance } from './services/gemini';
@@ -34,16 +36,15 @@ const App: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [files, setFiles] = useState<FileNode[]>([
-    { id: '1', name: 'main.py', content: 'print("Welcome to ParadoV2 ArcticX!")\n\n# ArcticX by Shashwat Ranjan Jha\ndef greet(name):\n    return f"Hello, {name}! ArcticX is ready to assist you."\n\nprint(greet("Developer"))' }
+    { id: '1', name: 'main.py', content: 'print("PARADO V2 ONLINE")\nprint("ArcticX by Shashwat Ranjan Jha ready.")\n\n# Try running this:\ndef fibonacci(n):\n    a, b = 0, 1\n    for _ in range(n):\n        yield a\n        a, b = b, a + b\n\nprint("Fibonacci sequence:", list(fibonacci(10)))' }
   ]);
   const [activeFileId, setActiveFileId] = useState('1');
   const [consoleMessages, setConsoleMessages] = useState<ConsoleMessage[]>([]);
-  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth > 1024);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [aiResponse, setAiResponse] = useState<string | null>(null);
   const [isConsoleExpanded, setIsConsoleExpanded] = useState(true);
   
-  // AI Generation State
   const [showGenPrompt, setShowGenPrompt] = useState(false);
   const [genPrompt, setGenPrompt] = useState('');
   const [isRunning, setIsRunning] = useState(false);
@@ -55,94 +56,68 @@ const App: React.FC = () => {
     setConsoleMessages(prev => [...prev, { type, content, timestamp: new Date() }]);
   };
 
-  // Responsive sidebar handling
+  // Improved Pyodide Loading to prevent "Blank Blue Screen" on Netlify
   useEffect(() => {
-    const handleResize = () => {
-      if (window.innerWidth <= 1024) setIsSidebarOpen(false);
-      else setIsSidebarOpen(true);
-    };
-    window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
-  }, []);
-
-  // Initialize Pyodide with improved resilience
-  useEffect(() => {
-    let isMounted = true;
-    const loadTimeout = setTimeout(() => {
-      if (isMounted && isLoading) {
-        setLoadError("Initialization taking longer than expected. Please check your internet connection.");
-      }
-    }, 12000);
-
-    const initPyodide = async () => {
+    let mounted = true;
+    const init = async () => {
       try {
-        let attempts = 0;
-        while (!window.loadPyodide && attempts < 100) {
-          await new Promise(r => setTimeout(r, 100));
-          attempts++;
+        console.log("Initializing ParadoV2 Core...");
+        
+        // Wait for script to be available with timeout
+        let checkCount = 0;
+        while (typeof window.loadPyodide === 'undefined' && checkCount < 50) {
+          await new Promise(r => setTimeout(r, 200));
+          checkCount++;
         }
 
-        if (!window.loadPyodide) {
-          throw new Error("Pyodide script failed to load. Check your connection.");
+        if (typeof window.loadPyodide === 'undefined') {
+          throw new Error("Pyodide script failed to load from CDN. Check network.");
         }
 
         const py = await window.loadPyodide({
           indexURL: "https://cdn.jsdelivr.net/pyodide/v0.26.4/full/"
         });
         
-        if (isMounted) {
+        if (mounted) {
           setPyodide(py);
           setIsLoading(false);
-          clearTimeout(loadTimeout);
-          addConsoleMessage('system', 'ParadoV2 Runtime Initialized. Python 3.12 ready.');
+          addConsoleMessage('system', 'ParadoV2 Core successfully initialized. Python 3.12 active.');
         }
       } catch (err: any) {
-        if (isMounted) {
-          console.error(err);
-          setLoadError(`Failed to load Python runtime: ${err.message}`);
+        console.error("Pyodide Load Error:", err);
+        if (mounted) {
+          setLoadError(err.message || "Unknown error during initialization.");
           setIsLoading(false);
-          clearTimeout(loadTimeout);
         }
       }
     };
 
-    initPyodide();
-    return () => { isMounted = false; };
+    init();
+    return () => { mounted = false; };
   }, []);
 
-  // Keyboard Shortcuts
+  // Handle sidebar for mobile automatically
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
-        e.preventDefault();
-        handleRunCode();
-      }
-      if ((e.ctrlKey || e.metaKey) && e.key === 'i') {
-        e.preventDefault();
-        setShowGenPrompt(true);
-      }
+    const checkWidth = () => {
+      if (window.innerWidth < 1024) setIsSidebarOpen(false);
+      else setIsSidebarOpen(true);
     };
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [pyodide, activeFile.content]);
+    checkWidth();
+    window.addEventListener('resize', checkWidth);
+    return () => window.removeEventListener('resize', checkWidth);
+  }, []);
 
   const handleRunCode = async () => {
     if (!pyodide || isRunning) return;
-    
     setIsRunning(true);
-    addConsoleMessage('system', `Execution started: ${activeFile.name}`);
     setIsConsoleExpanded(true);
+    addConsoleMessage('system', `Executing: ${activeFile.name}`);
 
     try {
-      pyodide.setStdout({
-        batched: (text: string) => addConsoleMessage('stdout', text)
-      });
-      pyodide.setStderr({
-        batched: (text: string) => addConsoleMessage('stderr', text)
-      });
-
+      pyodide.setStdout({ batched: (text: string) => addConsoleMessage('stdout', text) });
+      pyodide.setStderr({ batched: (text: string) => addConsoleMessage('stderr', text) });
       await pyodide.runPythonAsync(activeFile.content);
-      addConsoleMessage('system', 'Process finished successfully.');
+      addConsoleMessage('system', 'Execution complete.');
     } catch (err: any) {
       addConsoleMessage('stderr', err.message);
     } finally {
@@ -155,9 +130,9 @@ const App: React.FC = () => {
     setAiResponse(null);
     try {
       const result = await getAIAssistance('', activeFile.content, mode);
-      setAiResponse(result || 'No response from ArcticX.');
-    } catch (err) {
-      setAiResponse(`Error: ${err}`);
+      setAiResponse(result);
+    } catch (err: any) {
+      setAiResponse(`ArcticX Error: ${err.message}`);
     } finally {
       setIsAIProcessing(false);
     }
@@ -171,14 +146,11 @@ const App: React.FC = () => {
       const result = await getAIAssistance(genPrompt, activeFile.content, 'generate');
       const codeMatch = result?.match(/```python\n([\s\S]*?)```/) || result?.match(/```\n([\s\S]*?)```/);
       const extractedCode = codeMatch ? codeMatch[1] : result;
-
       if (extractedCode) {
-        const newContent = activeFile.content + `\n\n# --- Generated by ArcticX ---\n` + extractedCode;
-        updateFileContent(newContent);
-        addConsoleMessage('system', 'ArcticX code injected successfully.');
+        updateFileContent(activeFile.content + '\n\n# ArcticX Result\n' + extractedCode);
       }
-    } catch (err) {
-      addConsoleMessage('stderr', `Generation failed: ${err}`);
+    } catch (err: any) {
+      addConsoleMessage('stderr', `ArcticX Generator Error: ${err.message}`);
     } finally {
       setIsAIProcessing(false);
       setGenPrompt('');
@@ -190,44 +162,34 @@ const App: React.FC = () => {
   };
 
   const createNewFile = () => {
+    const name = prompt("File name (e.g. app.py):", `script_${files.length}.py`);
+    if (!name) return;
     const newId = Date.now().toString();
-    const newFile: FileNode = { id: newId, name: `script_${files.length}.py`, content: '' };
-    setFiles(prev => [...prev, newFile]);
+    setFiles(prev => [...prev, { id: newId, name, content: '' }]);
     setActiveFileId(newId);
   };
 
   const deleteFile = (id: string) => {
     if (files.length <= 1) return;
     setFiles(prev => prev.filter(f => f.id !== id));
-    if (activeFileId === id) {
-      const remaining = files.filter(f => f.id !== id);
-      setActiveFileId(remaining[0].id);
-    }
+    if (activeFileId === id) setActiveFileId(files.find(f => f.id !== id)!.id);
   };
 
   if (isLoading) {
     return (
-      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#020617] text-white p-6">
-        <div className="relative mb-10">
-          <div className="w-32 h-32 border-8 border-blue-500/10 border-t-blue-600 rounded-full animate-spin"></div>
-          <Cpu className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500 animate-pulse" size={56} />
+      <div className="h-screen w-screen flex flex-col items-center justify-center bg-[#020617] text-white p-12">
+        <div className="relative mb-12">
+          <div className="w-32 h-32 border-[10px] border-blue-600/10 border-t-blue-500 rounded-full animate-spin shadow-[0_0_50px_rgba(59,130,246,0.2)]"></div>
+          <Cpu className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={48} />
         </div>
-        <div className="text-center max-w-lg">
-          <h1 className="text-5xl font-black tracking-tighter mb-4 text-transparent bg-clip-text bg-gradient-to-br from-blue-400 via-indigo-400 to-purple-500">PARADO V2</h1>
-          <p className="text-slate-400 font-medium text-lg mb-8 tracking-wide">Initializing ArcticX Advanced IDE...</p>
+        <div className="text-center animate-in fade-in slide-in-from-bottom-4 duration-1000">
+          <h1 className="text-6xl font-black tracking-tighter mb-4 text-white uppercase italic">Parado V2</h1>
+          <p className="text-blue-400 font-bold uppercase tracking-[0.4em] text-xs">Booting ArcticX Intelligence</p>
           {loadError && (
-            <div className="p-6 bg-red-500/5 border border-red-500/20 rounded-2xl flex items-start gap-4 text-left shadow-2xl">
-              <AlertCircle className="text-red-500 shrink-0 mt-1" size={24} />
-              <div>
-                <p className="text-red-500 text-lg font-black uppercase tracking-widest">Initialization Failure</p>
-                <p className="text-red-400/80 text-sm mt-2 leading-relaxed">{loadError}</p>
-                <button 
-                  onClick={() => window.location.reload()}
-                  className="mt-5 text-xs uppercase font-black tracking-[0.2em] px-6 py-2.5 bg-red-600 text-white rounded-xl hover:bg-red-500 transition-all shadow-lg active:scale-95"
-                >
-                  Force Reboot
-                </button>
-              </div>
+            <div className="mt-8 p-6 bg-red-500/10 border border-red-500/20 rounded-3xl max-w-md mx-auto">
+              <p className="text-red-400 font-bold mb-4 uppercase tracking-widest text-sm">Critical Failure</p>
+              <p className="text-red-300/80 text-xs leading-relaxed mb-6">{loadError}</p>
+              <button onClick={() => window.location.reload()} className="bg-red-600 hover:bg-red-500 px-8 py-3 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg shadow-red-500/20">Emergency Reload</button>
             </div>
           )}
         </div>
@@ -236,295 +198,286 @@ const App: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden font-sans">
+    <div className="flex h-screen bg-[#020617] text-slate-200 overflow-hidden selection:bg-blue-500/30">
       {/* Sidebar */}
-      <aside className={`${isSidebarOpen ? 'w-80' : 'w-0'} bg-[#020617] border-r border-slate-800/50 transition-all duration-500 ease-in-out flex flex-col z-40 relative group/sidebar`}>
-        <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-[#020617]">
+      <aside className={`${isSidebarOpen ? 'w-80 translate-x-0' : 'w-0 -translate-x-full lg:w-0'} bg-[#020617] border-r border-slate-800/50 flex flex-col z-50 transition-all duration-300 ease-out`}>
+        <div className="h-20 flex items-center justify-between px-6 border-b border-slate-800/50 shrink-0">
           <div className="flex items-center gap-4">
-            <div className="bg-gradient-to-br from-blue-600 to-indigo-700 p-2.5 rounded-2xl shadow-2xl shadow-blue-500/20 ring-1 ring-white/10">
-              <Cpu size={24} className="text-white" />
+            <div className="p-2.5 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl shadow-lg shadow-blue-500/20">
+              <Layers size={22} className="text-white" />
             </div>
             <div>
-              <span className="font-black text-2xl tracking-tighter text-white block">PARADO</span>
-              <span className="text-[10px] text-blue-400 font-black tracking-[0.3em] uppercase block leading-none">V2 CORE</span>
+              <span className="text-xl font-black text-white tracking-tighter block leading-none">PARADO</span>
+              <span className="text-[9px] text-blue-400 font-black tracking-[0.3em] uppercase block mt-1">V2.1.0</span>
             </div>
           </div>
-          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden text-slate-500 hover:text-white transition-colors">
-            <X size={24} />
+          <button onClick={() => setIsSidebarOpen(false)} className="lg:hidden p-2 hover:bg-slate-800 rounded-xl transition-colors">
+            <X size={20} className="text-slate-500" />
           </button>
         </div>
 
-        <div className="flex-1 overflow-y-auto py-8 scrollbar-thin scrollbar-thumb-slate-800">
-          <div className="px-6 mb-6 flex items-center justify-between">
-            <span className="text-xs font-black text-slate-500 uppercase tracking-[0.2em]">Project Files</span>
-            <button onClick={createNewFile} className="p-2 hover:bg-blue-600/10 rounded-xl text-slate-400 hover:text-blue-400 transition-all border border-transparent hover:border-blue-500/30" title="New Python File">
-              <Plus size={20} />
-            </button>
-          </div>
-          <nav className="space-y-1.5 px-3">
-            {files.map(file => (
-              <div 
-                key={file.id}
-                onClick={() => setActiveFileId(file.id)}
-                className={`group px-4 py-3 flex items-center justify-between cursor-pointer rounded-2xl transition-all ${
-                  activeFileId === file.id 
-                  ? 'bg-blue-600/10 text-blue-400 ring-1 ring-blue-500/30 shadow-lg shadow-blue-500/5' 
-                  : 'hover:bg-slate-800/40 text-slate-400 hover:text-slate-200'
-                }`}
-              >
-                <div className="flex items-center gap-3.5 overflow-hidden">
-                  <FileCode size={20} className={activeFileId === file.id ? 'text-blue-400' : 'text-slate-500'} />
-                  <span className="truncate text-sm font-bold tracking-tight">{file.name}</span>
+        <div className="flex-1 overflow-y-auto py-8 px-4 space-y-8">
+          <div>
+            <div className="flex items-center justify-between px-2 mb-4">
+              <h2 className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">Project Tree</h2>
+              <button onClick={createNewFile} className="p-1.5 hover:bg-blue-500/10 rounded-lg text-slate-500 hover:text-blue-400 transition-all">
+                <Plus size={18} />
+              </button>
+            </div>
+            <div className="space-y-1">
+              {files.map(file => (
+                <div 
+                  key={file.id}
+                  onClick={() => setActiveFileId(file.id)}
+                  className={`group flex items-center justify-between px-4 py-3 rounded-xl cursor-pointer transition-all border ${
+                    activeFileId === file.id 
+                    ? 'bg-blue-600/10 border-blue-500/30 text-blue-400 shadow-lg shadow-blue-500/5' 
+                    : 'bg-transparent border-transparent hover:bg-slate-800/40 text-slate-500'
+                  }`}
+                >
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    <FileCode size={18} className={activeFileId === file.id ? 'text-blue-400' : 'text-slate-600'} />
+                    <span className="truncate text-sm font-bold tracking-tight">{file.name}</span>
+                  </div>
+                  {files.length > 1 && (
+                    <button onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }} className="opacity-0 group-hover:opacity-100 p-1 hover:text-red-400 transition-all">
+                      <Trash2 size={14} />
+                    </button>
+                  )}
                 </div>
-                {files.length > 1 && (
-                  <button onClick={(e) => { e.stopPropagation(); deleteFile(file.id); }} className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-500/10 hover:text-red-400 rounded-lg transition-all">
-                    <Trash2 size={16} />
-                  </button>
-                )}
-              </div>
-            ))}
-          </nav>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <div className="p-8 border-t border-slate-800/50 bg-[#020617] space-y-4">
-          <div className="flex items-center gap-4 text-xs">
-            <div className="w-3 h-3 rounded-full bg-green-500 shadow-xl shadow-green-500/40 ring-4 ring-green-500/10"></div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest">WASM Python 3.12</span>
+        <div className="p-6 border-t border-slate-800/50 space-y-4">
+          <div className="p-4 bg-slate-900/50 rounded-2xl border border-slate-800/50">
+            <div className="flex items-center gap-3 mb-2">
+              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
+              <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Environment</span>
+            </div>
+            <p className="text-[10px] text-slate-500 font-bold">PYTHON 3.12 (WASM)</p>
           </div>
-          <div className="flex items-center gap-4 text-xs">
-            <div className="w-3 h-3 rounded-full bg-blue-500 shadow-xl shadow-blue-500/40 ring-4 ring-blue-500/10"></div>
-            <span className="text-slate-400 font-bold uppercase tracking-widest">ArcticX AI v1.2</span>
-          </div>
+          <p className="text-[9px] text-center text-slate-600 font-black uppercase tracking-[0.2em]">Dev: Shashwat Ranjan Jha</p>
         </div>
       </aside>
 
-      {/* Main Workspace */}
+      {/* Main Container */}
       <main className="flex-1 flex flex-col min-w-0 bg-[#020617] relative">
-        {/* Mobile Header Overlay */}
-        {!isSidebarOpen && (
-          <div className="absolute top-4 left-6 z-50">
-             <button onClick={() => setIsSidebarOpen(true)} className="p-3 bg-slate-900/80 backdrop-blur-md rounded-2xl border border-slate-800 text-blue-400 shadow-2xl active:scale-95 transition-all">
-                <Menu size={24} />
-             </button>
-          </div>
-        )}
-
-        {/* Top Header */}
-        <header className="h-20 bg-[#020617] border-b border-slate-800/50 flex items-center justify-between px-8 z-30">
-          <div className="flex items-center gap-6">
-            <div className="hidden sm:flex items-center gap-4 py-2 px-5 bg-slate-900/50 backdrop-blur-sm rounded-2xl border border-slate-800/50 shadow-inner">
-              <FileCode size={20} className="text-blue-400" />
-              <span className="text-sm text-slate-100 font-black tracking-tight">{activeFile.name}</span>
-              <ChevronDown size={16} className="text-slate-600" />
+        {/* Navbar */}
+        <header className="h-20 bg-[#020617] border-b border-slate-800/50 flex items-center justify-between px-4 lg:px-8 shrink-0">
+          <div className="flex items-center gap-4">
+            {!isSidebarOpen && (
+              <button onClick={() => setIsSidebarOpen(true)} className="p-3 bg-slate-900/80 rounded-xl border border-slate-800 text-blue-400 hover:text-blue-300 transition-all active:scale-90">
+                <Menu size={20} />
+              </button>
+            )}
+            <div className="hidden sm:flex items-center gap-3 py-2 px-5 bg-slate-900/40 rounded-xl border border-slate-800/50">
+              <FileCode size={18} className="text-blue-400" />
+              <span className="text-sm font-bold tracking-tight text-white">{activeFile.name}</span>
             </div>
           </div>
 
-          <div className="flex items-center gap-3 md:gap-6">
-            <div className="hidden lg:flex items-center bg-slate-900/40 rounded-2xl p-1.5 border border-slate-800/50 ring-1 ring-white/5">
-              <button onClick={() => setShowGenPrompt(true)} className="flex items-center gap-2.5 px-5 py-2.5 text-xs hover:bg-blue-600/10 rounded-xl text-blue-400 font-black uppercase tracking-widest transition-all group" title="ArcticX Command (Ctrl+I)">
-                <Wand2 size={16} className="group-hover:rotate-12 transition-transform" />
-                <span>Command</span>
+          <div className="flex items-center gap-2 lg:gap-6">
+            <div className="flex items-center bg-slate-900/40 rounded-xl p-1 border border-slate-800/50">
+              <button onClick={() => setShowGenPrompt(true)} className="p-2.5 hover:bg-blue-600/10 rounded-lg text-blue-400 transition-all group" title="ArcticX Command">
+                <Wand2 size={20} className="group-hover:rotate-12 transition-transform" />
               </button>
-              <div className="w-px h-6 bg-slate-800 mx-2"></div>
-              <button onClick={() => handleAIAction('debug')} className="flex items-center gap-2.5 px-5 py-2.5 text-xs hover:bg-orange-600/10 rounded-xl text-orange-400 font-black uppercase tracking-widest transition-all">
-                <Bug size={16} />
+              <div className="w-px h-6 bg-slate-800 mx-1"></div>
+              <button onClick={() => handleAIAction('debug')} className="hidden md:flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-orange-400 hover:bg-orange-600/10 rounded-lg transition-all">
+                <Bug size={14} />
                 <span>Fix</span>
+              </button>
+              <button onClick={() => handleAIAction('optimize')} className="hidden md:flex items-center gap-2 px-4 py-2 text-[10px] font-black uppercase tracking-widest text-purple-400 hover:bg-purple-600/10 rounded-lg transition-all">
+                <Zap size={14} />
+                <span>Opt</span>
+              </button>
+              <button className="md:hidden p-2.5 text-slate-500">
+                <MoreVertical size={20} />
               </button>
             </div>
 
             <button 
               onClick={handleRunCode}
               disabled={isRunning}
-              className={`flex items-center gap-4 px-6 md:px-14 py-3.5 rounded-2xl font-black transition-all transform active:scale-95 shadow-2xl relative overflow-hidden group ${
+              className={`flex items-center gap-3 md:gap-4 px-6 md:px-12 py-3.5 rounded-2xl font-black transition-all transform active:scale-95 shadow-2xl relative overflow-hidden group ${
                 isRunning 
-                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed opacity-50' 
-                  : 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white shadow-blue-500/20 ring-1 ring-white/20'
+                  ? 'bg-slate-800 text-slate-500 cursor-not-allowed' 
+                  : 'bg-gradient-to-r from-blue-600 via-blue-700 to-indigo-800 text-white shadow-blue-500/20 ring-1 ring-white/10'
               }`}
             >
-              <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent -translate-x-full group-hover:translate-x-full transition-transform duration-1000"></div>
-              {isRunning ? <RefreshCw size={28} className="animate-spin" /> : <Play size={28} fill="currentColor" />}
-              <span className="text-lg md:text-xl uppercase tracking-tighter">Execute</span>
-              <span className="text-[10px] opacity-60 font-black hidden sm:inline ml-2 tracking-widest">^↵</span>
+              {isRunning ? <RefreshCw size={24} className="animate-spin" /> : <Play size={24} fill="currentColor" />}
+              <span className="text-sm md:text-lg uppercase tracking-tighter">Execute</span>
             </button>
           </div>
         </header>
 
-        {/* Editor Area */}
-        <div className="flex-1 flex flex-col relative min-h-0 bg-[#0d1117]">
-          <div className="flex-1 relative overflow-hidden">
-             <div className="absolute top-0 left-0 w-16 h-full bg-[#020617] border-r border-slate-800/50 flex flex-col items-center py-8 text-slate-600 select-none pointer-events-none text-xs leading-[28px] font-mono font-bold">
-               {activeFile.content.split('\n').map((_, i) => (
-                 <div key={i}>{i + 1}</div>
-               ))}
-             </div>
-             <textarea
-                ref={textareaRef}
-                value={activeFile.content}
-                onChange={(e) => updateFileContent(e.target.value)}
-                className="w-full h-full pl-20 pr-10 py-8 bg-[#0d1117] text-slate-300 code-font text-[16px] leading-[28px] outline-none resize-none spellcheck-false focus:ring-1 focus:ring-blue-500/10 selection:bg-blue-500/30"
-                placeholder="# COMPOSE YOUR MASTERPIECE HERE..."
-                spellCheck={false}
-             />
+        {/* Workspace */}
+        <div className="flex-1 flex flex-col min-h-0">
+          <div className="flex-1 relative bg-[#0d1117] overflow-hidden">
+            <div className="absolute top-0 left-0 w-14 h-full bg-[#020617]/50 border-r border-slate-800/30 flex flex-col items-center py-8 text-slate-700 select-none font-mono text-xs leading-[28px]">
+              {activeFile.content.split('\n').map((_, i) => <div key={i}>{i + 1}</div>)}
+            </div>
+            <textarea
+              ref={textareaRef}
+              value={activeFile.content}
+              onChange={(e) => updateFileContent(e.target.value)}
+              className="w-full h-full pl-20 pr-8 py-8 bg-transparent text-slate-300 code-font text-[16px] leading-[28px] outline-none resize-none spellcheck-false selection:bg-blue-500/30"
+              placeholder="# ARCHITECT YOUR PYTHON LOGIC HERE..."
+              spellCheck={false}
+            />
+
+            {/* AI Generator Overlay */}
+            {showGenPrompt && (
+              <div className="absolute top-10 left-1/2 -translate-x-1/2 w-[calc(100%-40px)] max-w-2xl z-50 animate-in fade-in zoom-in-95 duration-300">
+                <div className="glass-card p-6 rounded-[2rem] shadow-2xl border-blue-500/20 shadow-blue-500/10">
+                  <div className="flex items-center gap-3 mb-6">
+                    <div className="p-2 bg-blue-500/20 rounded-xl"><Sparkles size={20} className="text-blue-400" /></div>
+                    <span className="text-xs font-black text-white uppercase tracking-[0.3em]">ArcticX Command</span>
+                  </div>
+                  <div className="flex gap-4">
+                    <input 
+                      autoFocus
+                      type="text"
+                      value={genPrompt}
+                      onChange={(e) => setGenPrompt(e.target.value)}
+                      onKeyDown={(e) => e.key === 'Enter' && handleGenerateCode()}
+                      placeholder="E.G., BUILD A SECURE FILE HANDLER..."
+                      className="flex-1 bg-black/40 border border-slate-700/50 rounded-2xl px-6 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-white placeholder-slate-700 transition-all uppercase tracking-wider"
+                    />
+                    <button onClick={handleGenerateCode} className="bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-[10px] transition-all shadow-lg shadow-blue-500/20 active:scale-95">Generate</button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* AI Assistant Overlay */}
+            {(isAIProcessing || aiResponse) && (
+              <div className="absolute top-8 right-4 lg:right-12 w-full max-w-md max-h-[85%] z-50 animate-in slide-in-from-right-12 duration-500">
+                <div className="glass-card flex flex-col rounded-[2.5rem] shadow-[0_40px_80px_-20px_rgba(0,0,0,0.8)] overflow-hidden border-slate-800/80">
+                  <div className="p-6 bg-slate-900/60 border-b border-slate-800/50 flex items-center justify-between">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-xl shadow-blue-500/20">
+                        <Sparkles size={24} />
+                      </div>
+                      <div>
+                        <h3 className="text-sm font-black text-white uppercase tracking-tight leading-none">ArcticX Assistant</h3>
+                        <p className="text-[9px] text-blue-500 font-black tracking-[0.2em] uppercase mt-1">Shashwat Ranjan Jha</p>
+                      </div>
+                    </div>
+                    <button onClick={() => setAiResponse(null)} className="p-2.5 text-slate-500 hover:text-white transition-all bg-slate-800/50 rounded-xl">
+                      <X size={20} />
+                    </button>
+                  </div>
+                  
+                  <div className="p-8 overflow-y-auto max-h-[500px] text-sm leading-relaxed scrollbar-thin scrollbar-thumb-slate-800">
+                    {isAIProcessing ? (
+                      <div className="flex flex-col items-center py-24 space-y-8">
+                        <div className="relative">
+                          <div className="w-20 h-20 border-4 border-blue-600/10 border-t-blue-500 rounded-full animate-spin"></div>
+                          <Wand2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-500" size={28} />
+                        </div>
+                        <div className="text-center">
+                          <p className="text-white font-black text-lg uppercase tracking-widest">Architecting</p>
+                          <p className="text-[10px] text-slate-500 mt-2 uppercase tracking-[0.3em] font-black italic">Refining Logic Streams</p>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-8">
+                        <div className="bg-black/60 rounded-[2rem] p-6 border border-slate-800/50 shadow-inner">
+                          <pre className="whitespace-pre-wrap font-mono text-sm text-slate-200 tracking-tight leading-relaxed">{aiResponse}</pre>
+                        </div>
+                        <button 
+                          onClick={() => {
+                            const codeMatch = aiResponse?.match(/```python\n([\s\S]*?)```/) || aiResponse?.match(/```\n([\s\S]*?)```/);
+                            const extracted = codeMatch ? codeMatch[1] : aiResponse;
+                            updateFileContent(activeFile.content + '\n\n' + extracted);
+                            setAiResponse(null);
+                          }}
+                          className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] flex items-center justify-center gap-4 transition-all shadow-2xl shadow-blue-500/20 active:scale-[0.98]"
+                        >
+                          <Check size={20} />
+                          Inject Into Workspace
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
 
-          {/* Floating AI Generation Box */}
-          {showGenPrompt && (
-            <div className="absolute top-8 left-1/2 -translate-x-1/2 w-[calc(100%-48px)] max-w-2xl z-50 animate-in fade-in slide-in-from-top-8 duration-500">
-              <div className="bg-[#1e293b]/90 backdrop-blur-xl border border-blue-500/40 rounded-3xl shadow-[0_32px_64px_-16px_rgba(0,0,0,0.6)] p-6 shadow-blue-500/10 ring-1 ring-white/10">
-                <div className="flex items-center gap-3 mb-5">
-                  <div className="p-2 bg-blue-500/20 rounded-xl">
-                    <Sparkles size={20} className="text-blue-400" />
-                  </div>
-                  <span className="text-sm font-black text-white uppercase tracking-[0.2em]">ArcticX Command Interface</span>
+          {/* Console */}
+          <section className={`${isConsoleExpanded ? 'h-96' : 'h-14'} bg-[#020617] border-t border-slate-800/50 flex flex-col transition-all duration-500 ease-in-out z-40`}>
+            <div onClick={() => setIsConsoleExpanded(!isConsoleExpanded)} className="h-14 flex items-center justify-between px-8 cursor-pointer hover:bg-slate-900/40 transition-colors">
+              <div className="flex items-center gap-6">
+                <div className="flex items-center gap-2.5">
+                  <TerminalIcon size={16} className="text-blue-500" />
+                  <span className="text-[10px] font-black uppercase tracking-[0.4em] text-slate-500">Live Process Feed</span>
                 </div>
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <input 
-                    autoFocus
-                    type="text"
-                    value={genPrompt}
-                    onChange={(e) => setGenPrompt(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleGenerateCode()}
-                    placeholder="E.G., BUILD A SECURE AUTHENTICATION SYSTEM..."
-                    className="flex-1 bg-black/40 border border-slate-700/50 rounded-2xl px-5 py-4 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/40 text-white placeholder-slate-600 uppercase tracking-wide transition-all"
-                  />
-                  <div className="flex gap-3">
-                    <button onClick={handleGenerateCode} className="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-500 text-white px-8 py-4 rounded-2xl font-black uppercase tracking-widest text-xs transition-all active:scale-95 shadow-lg shadow-blue-500/20">Generate</button>
-                    <button onClick={() => setShowGenPrompt(false)} className="bg-slate-800 hover:bg-slate-700 text-slate-400 p-4 rounded-2xl transition-all"><X size={20} /></button>
-                  </div>
-                </div>
+                {consoleMessages.length > 0 && (
+                  <span className="bg-blue-600/10 text-blue-400 text-[9px] font-black px-3 py-1 rounded-full border border-blue-500/20">{consoleMessages.length} ENTRIES</span>
+                )}
+              </div>
+              <div className="flex items-center gap-6">
+                <button onClick={(e) => { e.stopPropagation(); setConsoleMessages([]); }} className="p-2 text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-all">
+                  <Trash2 size={16} />
+                </button>
+                <ChevronRight size={18} className={`text-slate-600 transition-transform duration-300 ${isConsoleExpanded ? 'rotate-90' : ''}`} />
               </div>
             </div>
-          )}
 
-          {/* AI Side Result Panel */}
-          {(isAIProcessing || aiResponse) && (
-            <div className="absolute top-8 right-8 w-full max-w-md max-h-[80%] bg-[#020617]/90 backdrop-blur-xl border border-slate-800/50 rounded-[32px] shadow-[0_32px_128px_-32px_rgba(0,0,0,0.8)] flex flex-col z-40 overflow-hidden animate-in slide-in-from-right-8 duration-500 ring-1 ring-white/10">
-              <div className="p-6 border-b border-slate-800/50 flex items-center justify-between bg-slate-900/40">
-                <div className="flex items-center gap-4">
-                  <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
-                    <Sparkles size={24} />
-                  </div>
-                  <div>
-                    <h3 className="text-base font-black text-white uppercase tracking-tight">ArcticX Intelligence</h3>
-                    <p className="text-[10px] text-blue-500 font-black tracking-[0.3em] uppercase opacity-70">By Shashwat Ranjan Jha</p>
-                  </div>
-                </div>
-                <button onClick={() => setAiResponse(null)} className="p-2 text-slate-500 hover:text-white transition-colors bg-slate-800/50 rounded-xl">
-                  <X size={20} />
-                </button>
-              </div>
-              <div className="p-8 overflow-y-auto text-sm text-slate-300 leading-relaxed scrollbar-thin scrollbar-thumb-slate-800">
-                {isAIProcessing ? (
-                  <div className="flex flex-col items-center py-20 space-y-8">
-                    <div className="relative">
-                      <div className="w-24 h-24 border-2 border-blue-500/5 border-t-blue-500 rounded-full animate-spin"></div>
-                      <Wand2 className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-blue-400" size={32} />
-                    </div>
-                    <div className="text-center">
-                      <p className="text-white font-black text-xl uppercase tracking-widest">Processing</p>
-                      <p className="text-xs text-slate-500 mt-2 uppercase tracking-[0.3em] font-black">Architecting Logic</p>
-                    </div>
+            {isConsoleExpanded && (
+              <div className="flex-1 p-8 overflow-y-auto code-font text-[15px] bg-[#020617] scrollbar-thin">
+                {consoleMessages.length === 0 ? (
+                  <div className="h-full flex flex-col items-center justify-center opacity-10 select-none grayscale">
+                    <Code size={64} className="mb-6 text-slate-600" />
+                    <p className="text-xl font-black uppercase tracking-[0.5em] text-slate-600">IDLE ENGINE</p>
                   </div>
                 ) : (
-                  <div className="space-y-6">
-                     <div className="bg-black/60 rounded-3xl p-6 border border-slate-800/50 shadow-inner">
-                       <pre className="whitespace-pre-wrap font-mono text-sm leading-relaxed text-slate-200">{aiResponse}</pre>
-                     </div>
-                     <button 
-                        onClick={() => {
-                          const codeMatch = aiResponse?.match(/```python\n([\s\S]*?)```/) || aiResponse?.match(/```\n([\s\S]*?)```/);
-                          const extracted = codeMatch ? codeMatch[1] : aiResponse;
-                          updateFileContent(activeFile.content + '\n\n' + extracted);
-                          setAiResponse(null);
-                        }}
-                        className="w-full bg-blue-600 hover:bg-blue-500 text-white py-5 rounded-2xl font-black uppercase tracking-[0.2em] text-xs flex items-center justify-center gap-4 transition-all active:scale-[0.98] shadow-2xl shadow-blue-500/20"
-                     >
-                       <Check size={20} />
-                       Inject Code
-                     </button>
+                  <div className="space-y-4 pb-12">
+                    {consoleMessages.map((msg, idx) => (
+                      <div key={idx} className="flex gap-6 group animate-in fade-in slide-in-from-left-4 duration-300">
+                        <span className="text-slate-700 shrink-0 text-[10px] mt-1.5 font-black uppercase tracking-widest group-hover:text-slate-500 transition-colors">
+                          {msg.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                        </span>
+                        <pre className={`whitespace-pre-wrap break-all font-mono text-[14px] px-5 py-3 rounded-2xl border ${
+                          msg.type === 'stderr' ? 'text-red-400 bg-red-500/5 border-red-500/20 shadow-lg shadow-red-500/5' : 
+                          msg.type === 'system' ? 'text-blue-400 font-black bg-blue-600/5 border-blue-500/30' : 'text-slate-300 bg-slate-900/30 border-slate-800/50'
+                        }`}>
+                          {msg.content}
+                        </pre>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
-            </div>
-          )}
+            )}
+          </section>
         </div>
 
-        {/* Console / Terminal Panel */}
-        <section className={`${isConsoleExpanded ? 'h-96' : 'h-14'} bg-[#020617] transition-all duration-500 ease-in-out flex flex-col border-t border-slate-800/50 relative z-20`}>
-          <div onClick={() => setIsConsoleExpanded(!isConsoleExpanded)} className="flex items-center justify-between px-8 h-14 bg-[#020617] cursor-pointer hover:bg-slate-900/50 transition-colors">
-            <div className="flex items-center gap-6">
-              <div className="flex items-center gap-3">
-                <TerminalIcon size={18} className="text-blue-500" />
-                <span className="text-[11px] font-black uppercase tracking-[0.4em] text-slate-500">Live Engine Stream</span>
-              </div>
-              {consoleMessages.length > 0 && (
-                <span className="bg-blue-500/10 text-blue-400 text-[10px] font-black px-3 py-1 rounded-full border border-blue-500/20">{consoleMessages.length} ENTRIES</span>
-              )}
+        {/* Footer */}
+        <footer className="h-8 bg-[#020617] border-t border-slate-800/50 flex items-center justify-between px-6 text-[9px] font-black text-slate-600 z-50 shrink-0">
+          <div className="flex items-center gap-8">
+            <div className="flex items-center gap-2.5 text-blue-500/60 uppercase tracking-widest">
+              <RefreshCw size={10} className={isRunning ? 'animate-spin' : ''} />
+              <span>Engine Status: Online</span>
             </div>
-            <div className="flex items-center gap-6">
-              <button onClick={(e) => { e.stopPropagation(); setConsoleMessages([]); }} className="text-slate-500 hover:text-red-500 p-2 transition-all hover:bg-red-500/10 rounded-xl" title="Clear Terminal">
-                <Trash2 size={18} />
-              </button>
-              <div className={`p-1.5 bg-slate-900 rounded-lg transition-all ${isConsoleExpanded ? 'rotate-90' : 'rotate-0'}`}>
-                <ChevronRight size={18} className="text-slate-500" />
-              </div>
+            <div className="hidden sm:flex items-center gap-2.5 uppercase tracking-widest">
+              <Sparkles size={10} className="text-indigo-400" />
+              <span>ArcticX Powered</span>
             </div>
           </div>
-          
-          {isConsoleExpanded && (
-            <div className="flex-1 p-8 overflow-y-auto code-font text-[15px] bg-[#020617] scrollbar-thin scrollbar-thumb-slate-800">
-              {consoleMessages.length === 0 ? (
-                <div className="h-full flex flex-col items-center justify-center opacity-10 select-none grayscale">
-                  <TerminalIcon size={80} className="mb-6 text-slate-600" />
-                  <p className="text-2xl font-black uppercase tracking-[0.5em] text-slate-600 italic">SYSTEM IDLE</p>
-                </div>
-              ) : (
-                <div className="space-y-4">
-                  {consoleMessages.map((msg, idx) => (
-                    <div key={idx} className="flex gap-6 group animate-in fade-in slide-in-from-left-4 duration-300">
-                      <span className="text-slate-700 shrink-0 text-[10px] mt-1.5 font-black group-hover:text-slate-500 transition-colors uppercase tracking-widest">
-                        {msg.timestamp.toLocaleTimeString([], { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit' })}
-                      </span>
-                      <pre className={`whitespace-pre-wrap break-all font-mono tracking-tight leading-relaxed text-[15px] px-5 py-3 rounded-2xl ${
-                        msg.type === 'stderr' ? 'text-red-400 bg-red-500/5 border border-red-500/20 shadow-lg shadow-red-500/5' : 
-                        msg.type === 'system' ? 'text-blue-400 font-black border-l-4 border-blue-600 bg-blue-600/5' : 'text-slate-200 bg-slate-900/30'
-                      }`}>
-                        {msg.content}
-                      </pre>
-                    </div>
-                  ))}
-                  <div className="h-8"></div>
-                </div>
-              )}
+          <div className="flex items-center gap-8 uppercase tracking-widest">
+            <span className="hidden md:inline">Memory Buffer: {(activeFile.content.length / 1024).toFixed(2)} KB</span>
+            <span className="text-blue-500/80">Dev: Shashwat Ranjan Jha</span>
+            <div className="flex items-center gap-2.5 text-green-500">
+              <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_10px_rgba(34,197,94,0.6)] animate-pulse"></div>
+              <span>Secure</span>
             </div>
-          )}
-        </section>
+          </div>
+        </footer>
       </main>
-
-      {/* Footer Status Bar */}
-      <footer className="fixed bottom-0 left-0 right-0 h-8 bg-[#020617] border-t border-slate-800/50 text-slate-600 flex items-center justify-between px-6 text-[10px] font-black z-50 select-none backdrop-blur-md">
-        <div className="flex items-center gap-8">
-          <div className="flex items-center gap-2.5 text-blue-500/80">
-            <RefreshCw size={12} className={isRunning ? 'animate-spin' : ''} />
-            <span className="uppercase tracking-[0.2em]">ArcticX Engine Active</span>
-          </div>
-          <div className="hidden md:flex items-center gap-2.5">
-            <Cpu size={12} />
-            <span className="uppercase tracking-[0.2em]">Parado V2 Environment</span>
-          </div>
-        </div>
-        <div className="flex items-center gap-8">
-          <div className="hidden sm:flex items-center gap-4">
-             <span className="opacity-50 tracking-widest uppercase">Buffer: {activeFile.content.length}b</span>
-             <span className="opacity-50 tracking-widest uppercase">L: {activeFile.content.split('\n').length}</span>
-          </div>
-          <span className="text-blue-500 tracking-[0.3em] uppercase">Developer: Shashwat Ranjan Jha</span>
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-green-500 shadow-[0_0_12px_rgba(34,197,94,0.6)] animate-pulse"></div>
-            <span className="text-green-500 uppercase tracking-widest">Secure</span>
-          </div>
-        </div>
-      </footer>
     </div>
   );
 };
