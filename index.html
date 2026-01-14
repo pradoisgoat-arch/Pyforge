@@ -7,12 +7,24 @@
     <title>ParadoV2 | ArcticX IDE</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%233b82f6'/%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8'/%3E%3C/linearGradient%3E%3Cpath d='M50 5 L90 25 L90 75 L50 95 L10 75 L10 25 Z' fill='url(%23g)'/%3E%3Cpath d='M30 40 L50 30 L70 40 L70 60 L50 70 L30 60 Z' fill='white' opacity='0.8'/%3E%3C/svg%3E" />
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load Pyodide before the app starts -->
+    <!-- Preload Pyodide -->
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
     <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     <script>
-      // Failsafe for environment variables in case they aren't polyfilled by the host
-      window.process = window.process || { env: {} };
+      // Ultimate Failsafe for environment variables
+      (function() {
+        if (typeof window.process === 'undefined') {
+          window.process = { env: {} };
+        } else if (typeof window.process.env === 'undefined') {
+          window.process.env = {};
+        }
+        console.log("ParadoV2: Process polyfill applied.");
+      })();
+
+      // Global error listener for debugging deployment
+      window.onerror = function(message, source, lineno, colno, error) {
+        console.error("ParadoV2 Global Error:", message, "at", source, lineno, colno);
+      };
     </script>
     <style>
       body {
@@ -48,12 +60,13 @@
   <script type="importmap">
 {
   "imports": {
-    "react/": "https://esm.sh/react@^19.2.3/",
-    "react": "https://esm.sh/react@^19.2.3",
-    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "react": "https://esm.sh/react@19.0.0",
+    "react-dom": "https://esm.sh/react-dom@19.0.0",
+    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.460.0?external=react",
+    "@google/genai": "https://esm.sh/@google/genai@1.35.0",
     "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react-dom": "https://esm.sh/react-dom@^19.2.3",
-    "@google/genai": "https://esm.sh/@google/genai@^1.35.0"
+    "react/": "https://esm.sh/react@^19.2.3/"
   }
 }
 </script>
