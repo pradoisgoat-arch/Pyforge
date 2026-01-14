@@ -4,36 +4,28 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>ParadoV2 | ArcticX IDE</title>
+    <title>ParadoV2 | ArcticX Architect</title>
     <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3ClinearGradient id='g' x1='0%25' y1='0%25' x2='100%25' y2='100%25'%3E%3Cstop offset='0%25' style='stop-color:%233b82f6'/%3E%3Cstop offset='100%25' style='stop-color:%231d4ed8'/%3E%3C/linearGradient%3E%3Cpath d='M50 5 L90 25 L90 75 L50 95 L10 75 L10 25 Z' fill='url(%23g)'/%3E%3Cpath d='M30 40 L50 30 L70 40 L70 60 L50 70 L30 60 Z' fill='white' opacity='0.8'/%3E%3C/svg%3E" />
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/pyodide/v0.26.4/full/pyodide.js"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@300;400;500;600&family=Inter:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <script>
-      // Global failsafe for process object used by some libraries
       window.process = { env: { API_KEY: "" } };
-      
-      window.onerror = function(msg, url, line, col, error) {
-        console.error("PARADO_BOOT_ERR:", msg);
-        const root = document.getElementById('root');
-        if (root && (root.innerHTML.includes('loading-spinner') || root.innerHTML === '')) {
-          root.innerHTML = `
-            <div style="height: 100vh; background: #020617; color: #ef4444; display: flex; align-items: center; justify-content: center; font-family: sans-serif; padding: 20px; text-align: center;">
-              <div>
-                <h1 style="font-size: 24px; font-weight: 900; margin-bottom: 10px;">BOOT ENGINE CRASHED</h1>
-                <p style="color: #94a3b8; font-size: 14px; max-width: 400px;">${msg}</p>
-                <button onclick="window.location.reload()" style="margin-top: 20px; background: #3b82f6; color: white; border: none; padding: 10px 20px; border-radius: 8px; font-weight: bold; cursor: pointer;">RESTART ENGINE</button>
-              </div>
-            </div>`;
-        }
-      };
     </script>
     <style>
-      body { font-family: 'Inter', sans-serif; background-color: #020617; color: #f8fafc; margin: 0; overflow: hidden; }
-      .code-font { font-family: 'Fira Code', monospace; }
-      .glass-card { background: rgba(15, 23, 42, 0.7); backdrop-filter: blur(12px); border: 1px solid rgba(255, 255, 255, 0.05); }
-      @keyframes spin { to { transform: rotate(360deg); } }
-      .loading-spinner { width: 50px; height: 50px; border: 4px solid rgba(59, 130, 246, 0.1); border-top-color: #3b82f6; border-radius: 50%; animation: spin 1s linear infinite; }
+      body { 
+        font-family: 'Plus Jakarta Sans', sans-serif; 
+        background-color: #020617; 
+        color: #f8fafc; 
+        margin: 0; 
+        overflow: hidden; 
+      }
+      .font-mono { font-family: 'Fira Code', monospace !important; }
+      .scrollbar-thin::-webkit-scrollbar { width: 5px; height: 5px; }
+      .scrollbar-thin::-webkit-scrollbar-track { background: transparent; }
+      .scrollbar-thin::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, 0.1); border-radius: 10px; }
+      .scrollbar-thin::-webkit-scrollbar-thumb:hover { background: rgba(255, 255, 255, 0.2); }
+      @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
     </style>
     <script type="importmap">
 {
@@ -50,12 +42,7 @@
 </script>
   </head>
   <body>
-    <div id="root">
-      <div style="height: 100vh; width: 100vw; display: flex; flex-direction: column; align-items: center; justify-content: center; background-color: #020617;">
-        <div class="loading-spinner"></div>
-        <p style="margin-top: 20px; font-family: 'Inter', sans-serif; font-size: 10px; font-weight: 900; color: #3b82f6; letter-spacing: 0.5em; text-transform: uppercase;">Booting Parado Engine</p>
-      </div>
-    </div>
+    <div id="root"></div>
     <script type="module" src="./index.tsx"></script>
   </body>
 </html>

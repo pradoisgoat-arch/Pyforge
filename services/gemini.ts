@@ -1,58 +1,86 @@
 
-import { GoogleGenAI } from "@google/genai";
-
-const IDENTITY_PROMPT = "IDENTITY: Your name is ArcticX. You are a world-class AI developer environment assistant created by Shashwat Ranjan Jha. DEVELOPER: Shashwat Ranjan Jha. ENVIRONMENT: You are running inside ParadoV2, which uses Pyodide (Python 3.12 via WebAssembly). NO ASTERISKS: You MUST NOT use asterisks (*) for formatting. Do not use them for bolding, italics, or lists. Use dashes (-) for lists and plain text for everything else. ADVICE: Since we are in a browser WASM environment, remind users that sockets and direct local file system access are limited, but they can use micropip to install packages.";
-
-const cleanOutput = (text: string | undefined): string => {
-  if (!text) return "";
-  return text.replace(/\*/g, '');
-};
+import { GoogleGenAI, Type, FunctionDeclaration } from "@google/genai";
 
 const getApiKey = (): string => {
-  try {
-    // Check various common places for the key
-    return (window as any).process?.env?.API_KEY || 
-           (typeof process !== 'undefined' ? process.env.API_KEY : '') || 
-           '';
-  } catch (e) {
-    return '';
-  }
+  return (window as any).process?.env?.API_KEY || '';
 };
 
-export const getAIAssistance = async (
-  prompt: string,
-  code: string,
-  mode: 'debug' | 'optimize' | 'explain' | 'generate'
-) => {
-  const apiKey = getApiKey();
-  
-  // If API_KEY is missing, we fail gracefully with a descriptive error
-  if (!apiKey) {
-    return "ArcticX Error: API_KEY is missing in environment. AI features are disabled.";
-  }
-
-  const ai = new GoogleGenAI({ apiKey });
-
-  const systemInstructions = {
-    debug: `${IDENTITY_PROMPT} TASK: Debug the provided Python code. Identify errors and provide a fix. NO ASTERISKS.`,
-    optimize: `${IDENTITY_PROMPT} TASK: Optimize the Python code for performance in a WASM environment. NO ASTERISKS.`,
-    explain: `${IDENTITY_PROMPT} TASK: Explain the code logic clearly. NO ASTERISKS.`,
-    generate: `${IDENTITY_PROMPT} TASK: Generate high-quality Python code based on the user request. NO ASTERISKS.`
-  };
-
-  try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3-flash-preview',
-      contents: `CURRENT CODE:\n${code}\n\nUSER REQUEST: ${prompt}`,
-      config: {
-        systemInstruction: systemInstructions[mode],
-        temperature: 0.5,
+export const IDE_TOOLS: FunctionDeclaration[] = [
+  {
+    name: "create_file",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Create a new Python file in the workspace.",
+      properties: {
+        name: { type: Type.STRING, description: "Name of the file, e.g., 'utils.py'" },
+        content: { type: Type.STRING, description: "Initial Python code for the file." }
       },
-    });
-
-    return cleanOutput(response.text);
-  } catch (error: any) {
-    console.error("ArcticX AI Error:", error);
-    return `ArcticX AI Error: ${error?.message || "Communication failure"}`;
+      required: ["name", "content"]
+    }
+  },
+  {
+    name: "update_file",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Update the content of an existing file.",
+      properties: {
+        id: { type: Type.STRING, description: "The unique ID of the file to update." },
+        content: { type: Type.STRING, description: "The new Python code content." }
+      },
+      required: ["id", "content"]
+    }
+  },
+  {
+    name: "delete_file",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Delete a file from the workspace.",
+      properties: {
+        id: { type: Type.STRING, description: "The unique ID of the file to delete." }
+      },
+      required: ["id"]
+    }
+  },
+  {
+    name: "install_package",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Install a Python package using micropip.",
+      properties: {
+        name: { type: Type.STRING, description: "The name of the package, e.g., 'numpy'" }
+      },
+      required: ["name"]
+    }
+  },
+  {
+    name: "run_code",
+    parameters: {
+      type: Type.OBJECT,
+      description: "Execute the currently active file and return results.",
+      properties: {}
+    }
   }
+];
+
+const IDENTITY = `You are ArcticX, an elite AI Architect integrated into the ParadoV2 IDE. 
+Created by Shashwat Ranjan Jha. You are autonomous.
+You can manage files, install packages, and run code using tools.
+When asked to modify code, use the 'update_file' tool.
+When asked to create new logic, use 'create_file'.
+Be concise, technical, and highly efficient. 
+Do not explain your tools unless asked. Just use them.`;
+
+export const getArcticXChat = () => {
+  const apiKey = getApiKey();
+  if (!apiKey) throw new Error("Missing API Key");
+  
+  const ai = new GoogleGenAI({ apiKey });
+  return ai.chats.create({
+    model: 'gemini-3-flash-preview',
+    config: {
+      systemInstruction: IDENTITY,
+      tools: [{ functionDeclarations: IDE_TOOLS }],
+      temperature: 0.7,
+    }
+  });
 };

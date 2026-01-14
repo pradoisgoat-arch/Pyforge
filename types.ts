@@ -6,19 +6,14 @@ export interface FileNode {
   isOpen?: boolean;
 }
 
-export interface ExecutionResult {
-  output: string;
-  error: string | null;
-}
-
-export interface AIAction {
-  type: 'debug' | 'optimize' | 'explain' | 'generate';
-  label: string;
-  icon: string;
-}
-
 export interface ConsoleMessage {
   type: 'stdout' | 'stderr' | 'system';
   content: string;
   timestamp: Date;
+}
+
+export interface ChatMessage {
+  role: 'user' | 'model';
+  parts: { text: string }[];
+  toolCalls?: any[];
 }
