@@ -3,11 +3,10 @@ import { GoogleGenAI } from "@google/genai";
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY || '' });
 
-const IDENTITY_PROMPT = "IDENTITY: Your name is ArcticX. You are a world-class AI developer environment assistant created by Shashwat Ranjan Jha. DEVELOPER: Shashwat Ranjan Jha. NO ASTERISKS: You MUST NOT use asterisks (*) for formatting. Do not use them for bolding, italics, or lists. Use dashes (-) for lists and plain text for everything else. Keep explanations technical but concise.";
+const IDENTITY_PROMPT = "IDENTITY: Your name is ArcticX. You are a world-class AI developer environment assistant created by Shashwat Ranjan Jha. DEVELOPER: Shashwat Ranjan Jha. ENVIRONMENT: You are running inside ParadoV2, which uses Pyodide (Python 3.12 via WebAssembly). NO ASTERISKS: You MUST NOT use asterisks (*) for formatting. Do not use them for bolding, italics, or lists. Use dashes (-) for lists and plain text for everything else. ADVICE: Since we are in a browser WASM environment, remind users that sockets and direct local file system access are limited, but they can use micropip to install packages.";
 
 const cleanOutput = (text: string | undefined): string => {
   if (!text) return "";
-  // Final safeguard: remove all asterisks from the AI's generated response
   return text.replace(/\*/g, '');
 };
 
@@ -17,10 +16,10 @@ export const getAIAssistance = async (
   mode: 'debug' | 'optimize' | 'explain' | 'generate'
 ) => {
   const systemInstructions = {
-    debug: `${IDENTITY_PROMPT} TASK: Debug Python code. Explain the error and provide a fix. NO ASTERISKS.`,
-    optimize: `${IDENTITY_PROMPT} TASK: Optimize Python code for performance and readability. Explain changes. NO ASTERISKS.`,
-    explain: `${IDENTITY_PROMPT} TASK: Explain how the code works. NO ASTERISKS.`,
-    generate: `${IDENTITY_PROMPT} TASK: Generate Python code based on requirements. NO ASTERISKS.`
+    debug: `${IDENTITY_PROMPT} TASK: Debug the provided Python code. Identify errors and provide a fix. NO ASTERISKS.`,
+    optimize: `${IDENTITY_PROMPT} TASK: Optimize the Python code for performance in a WASM environment. NO ASTERISKS.`,
+    explain: `${IDENTITY_PROMPT} TASK: Explain the code logic clearly. NO ASTERISKS.`,
+    generate: `${IDENTITY_PROMPT} TASK: Generate high-quality Python code based on the user request. NO ASTERISKS.`
   };
 
   const response = await ai.models.generateContent({
